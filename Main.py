@@ -3,8 +3,8 @@ import speech_recognition as sr
 from PIL import Image, ImageTk
 import tkinter as tk
 
-base_path = "C:\\Users\\mdufe\\Pictures\\StreamPNGs\\PNGTuber_Final_Renders\\"
-output_path = "C:\\Users\\mdufe\\Pictures\\StreamPNGs\\PNGTuber_Final_Renders\\current\\"
+base_path = ""
+output_path = ""
 
 current_set = "happy"
 talking = False
