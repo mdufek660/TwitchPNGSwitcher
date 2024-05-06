@@ -1,21 +1,23 @@
 import os
+import threading
+
+import sounddevice as sd
 import speech_recognition as sr
-from PIL import Image, ImageTk
-import tkinter as tk
+from PIL import Image
+import numpy as np
 
 base_path = "C:\\Users\\mdufe\\Pictures\\StreamPNGs\\PNGTuber_Final_Renders\\"
 output_path = "C:\\Users\\mdufe\\Pictures\\StreamPNGs\\PNGTuber_Final_Renders\\current\\"
 
 current_set = "happy"
-talking = False
 size = 300
 current_path = os.path.join(output_path, "temp.png")
+ambientTime = 3
 
 
 # Function to switch images based on voice commands
 def switch_image(command):
     global current_set
-    global talking
 
     if "angry dot exe" in command or "angry dot EXE" in command or "angry EXE" in command:
         current_set = "angry"
@@ -41,65 +43,160 @@ def switch_image(command):
 
 
 # Function to update the displayed image
-def update_image():
-    global talking
-    if talking:
-        activity = "_talking.png"
-    else:
-        activity = "_idle.png"
-    img_name = current_set + activity
-    img_path = base_path + img_name
+def update_image_set():
+    img_talking = Image.open(base_path + current_set + "_talking.png")
+    img_idle = Image.open(base_path + current_set + "_idle.png")
 
-    img = Image.open(img_path)
-    img = img.resize((size, size))  # Adjust size as needed
-    photo = ImageTk.PhotoImage(img)
+    img_talking = img_talking.resize((size, size))
+    img_idle = img_idle.resize((size, size))
 
-    label.configure(image=photo)
-    label.image = photo
-    resized_img = img.resize((size, size))
-
-    resized_img.save(current_path)
+    img_talking.save(output_path + "current_talking.png")
+    img_idle.save(output_path + "current_idle.png")
+    updateTempImage()
 
 
 # Function to recognize voice commands
 def recognize_voice():
-    global talking
-
     print("Listening...")
     try:
-        audio = recognizer.listen(source, timeout=5)
+        audio = recognizer.listen(source, timeout=5, phrase_time_limit=5)
 
         try:
             command = recognizer.recognize_google(audio)
             print("Heard: ", command)
-            talking = True
             switch_image(command)
 
-            update_image()
+            update_image_set()
         except sr.UnknownValueError:
             print("Could not understand audio")
         except sr.RequestError as e:
             print("Error:", e)
     except sr.WaitTimeoutError as e:
-        talking = False
-        update_image()
+        pass
+
+def speechDetector():
+# Callback function to process audio data
+    def callback(indata, frames, time, status):
+        global volumeTracker
+        audio_data = np.array(indata[:, 0])
+        volumeTracker.extend(audio_data)
+
+    def calculate_sound_level():
+        global volumeTracker
+        # Convert the accumulated samples to a NumPy array
+        samples_array = np.array(volumeTracker)
+
+        # Calculate the average sound level
+        db_temp = 20 * np.log10(np.sqrt(np.mean(samples_array**2)))
+        volumeTracker=[]
+        return db_temp
+
+    global volumeTracker
+    duration = 1  # Duration of audio recording in seconds
+    samplerate = 44100  # Sample rate
+    channels = 1  # Mono audio
+
+    global talking
+
+    print("* Listening for audio presence...")
+    # Start audio capture
+    while True:
+        with sd.InputStream(channels=channels, samplerate=samplerate, callback=callback):
+            sd.sleep(int(duration * 1000))
+        db = calculate_sound_level()
+        print(db)
+        if db > -38:
+            if not talking:
+                talking=True
+                updateTempImage()
+        else:
+            if talking:
+                talking=False
+                updateTempImage()
 
 
-# GUI setup
-root = tk.Tk()
-root.configure(bg='SystemButtonFace')
-root.title("Character Emotion Switcher")
-label = tk.Label(root, bg='SystemButtonFace')
-label.pack()
+def updateTempImage():
+    if talking:
+        img = Image.open(output_path + "current_talking.png")
+        img.save(output_path + "temp.png")
+    else:
+        img = Image.open(output_path + "current_idle.png")
+        img.save(output_path + "temp.png")
+
 
 # Main code
-update_image()
+talking = False
+update_image_set()
 recognizer = sr.Recognizer()
-with sr.Microphone() as source:
+listener = sr.Recognizer()
+volumeTracker = []
+
+with sr.Microphone() as source, sr.Microphone() as source2:
     print("Starting ambient noise adjustment")
-    recognizer.adjust_for_ambient_noise(source, 10)
+    recognizer.adjust_for_ambient_noise(source, ambientTime)
+    listener.adjust_for_ambient_noise(source2, ambientTime)
     print("Safe to talk now")
     # Main loop to continuously listen for voice commands
+    listener_thread = threading.Thread(target=speechDetector, daemon=True)
+    listener_thread.start()
     while True:
         recognize_voice()
-        root.update()
+
+# def listen_for_speech():
+#     CHUNK = 1024
+#     FORMAT = pyaudio.paInt16
+#     CHANNELS = 1
+#     RATE = 44100
+#
+#     p = pyaudio.PyAudio()
+#
+#     stream = p.open(format=FORMAT,
+#                     channels=CHANNELS,
+#                     rate=RATE,
+#                     input=True,
+#                     frames_per_buffer=CHUNK)
+#
+#     print("* Listening for speech...")
+#
+#     # Create a recognizer instance
+#     recognizer = sr.Recognizer()
+#     recognizer.energy_threshold = 4000  # Initial energy threshold
+#
+#     speaking = False
+#     while True:
+#         data = stream.read(CHUNK)
+#         audio_data = sr.AudioData(data, RATE, 2)
+#
+#         try:
+#             with sr.Microphone() as source:
+#                 audio = recognizer.listen(source)
+#                 if recognizer.energy_threshold < 3000:  # Adjust threshold dynamically
+#                     recognizer.energy_threshold = 3000
+#                 elif recognizer.energy_threshold > 8000:
+#                     recognizer.energy_threshold = 8000
+#         except sr.WaitTimeoutError:
+#             pass
+#
+#         # Check if speech is detected based on energy threshold
+#         if recognizer.energy_threshold < 5000:  # Adjust this threshold as needed
+#             if not speaking:
+#                 print("Speech detected")
+#                 send_signal("speaking")
+#                 speaking = True
+#         else:
+#             if speaking:
+#                 print("Speech stopped")
+#                 send_signal("not speaking")
+#                 speaking = False
+#
+# def send_signal(state):
+#     # Implement the logic to send a signal with the current state
+#     print("Signal:", state)
+#
+# if __name__ == "__main__":
+#     listen_for_speech()
+#     photo = ImageTk.PhotoImage(img)
+#
+#     label.configure(image=photo)
+#     label.image = photo
+#     resized_img = img.resize((size, size))
