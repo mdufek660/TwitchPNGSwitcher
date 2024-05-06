@@ -6,7 +6,7 @@ import speech_recognition as sr
 from PIL import Image
 import numpy as np
 
-base_path = "C:\\PNGTuber_Final_Renders\\"
+base_path = "C:\\PNGTuber_Final_Renders\\scaled_down\\"
 output_path = "C:\\PNGTuber_Final_Renders\\current\\"
 
 current_set = "happy"
@@ -44,15 +44,18 @@ def switch_image(command):
 
 # Function to update the displayed image
 def update_image_set():
-    img_talking = Image.open(base_path + current_set + "_talking.png")
-    img_idle = Image.open(base_path + current_set + "_idle.png")
+    try:
+        img_talking = Image.open(base_path + current_set + "_talking.png")
+        img_idle = Image.open(base_path + current_set + "_idle.png")
 
-    img_talking = img_talking.resize((size, size))
-    img_idle = img_idle.resize((size, size))
+        img_talking = img_talking.resize((size, size))
+        img_idle = img_idle.resize((size, size))
 
-    img_talking.save(output_path + "current_talking.png")
-    img_idle.save(output_path + "current_idle.png")
-    updateTempImage()
+        img_talking.save(output_path + "current_talking.png")
+        img_idle.save(output_path + "current_idle.png")
+        updateTempImage()
+    except:
+        pass
 
 
 # Function to recognize voice commands
@@ -74,8 +77,9 @@ def recognize_voice():
     except sr.WaitTimeoutError as e:
         pass
 
+
 def speechDetector():
-# Callback function to process audio data
+    # Callback function to process audio data
     def callback(indata, frames, time, status):
         global volumeTracker
         audio_data = np.array(indata[:, 0])
@@ -87,8 +91,8 @@ def speechDetector():
         samples_array = np.array(volumeTracker)
 
         # Calculate the average sound level
-        db_temp = 20 * np.log10(np.sqrt(np.mean(samples_array**2)))
-        volumeTracker=[]
+        db_temp = 20 * np.log10(np.sqrt(np.mean(samples_array ** 2)))
+        volumeTracker = []
         return db_temp
 
     global volumeTracker
@@ -107,21 +111,24 @@ def speechDetector():
         print(db)
         if db > -38:
             if not talking:
-                talking=True
+                talking = True
                 updateTempImage()
         else:
             if talking:
-                talking=False
+                talking = False
                 updateTempImage()
 
 
 def updateTempImage():
-    if talking:
-        img = Image.open(output_path + "current_talking.png")
-        img.save(output_path + "temp.png")
-    else:
-        img = Image.open(output_path + "current_idle.png")
-        img.save(output_path + "temp.png")
+    try:
+        if talking:
+            img = Image.open(output_path + "current_talking.png")
+            img.save(output_path + "temp.png")
+        else:
+            img = Image.open(output_path + "current_idle.png")
+            img.save(output_path + "temp.png")
+    except:
+        pass
 
 
 # Main code
