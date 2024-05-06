@@ -6,8 +6,8 @@ import speech_recognition as sr
 from PIL import Image
 import numpy as np
 
-base_path = ""
-output_path = ""
+base_path = "C:\\PNGTuber_Final_Renders\\"
+output_path = "C:\\PNGTuber_Final_Renders\\current\\"
 
 current_set = "happy"
 size = 300
